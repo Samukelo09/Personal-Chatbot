@@ -5,7 +5,7 @@
 
 import os
 import google.generativeai as genai
-import requests
+import re
 from datetime import datetime
 import streamlit as st
 
@@ -77,8 +77,7 @@ with st.sidebar:
         st.info(f"Selected sample: {sample}. Type it below or press Enter to send.")
 
     st.markdown("---")
-    # Utility buttons
-    
+
     if st.button("Clear chat"):
         st.session_state.messages = []
         st.session_state.copy_buffer = ""
@@ -91,7 +90,17 @@ with st.sidebar:
     if st.session_state.copy_buffer:
         st.text_area("Copy from here:", st.session_state.copy_buffer, height=120)
 
-
+_CIT_PATTERNS = [
+    r"\(\s*Doc[s]?\s*[\d,\s]+\)",
+    r"\[\s*Doc[s]?\s*[\d,\s]+\s*\]",
+    r"\[\s*\d+(?:\s*,\s*\d+)*\s*\]",
+    r"\(\s*\d+(?:\s*,\s*\d+)*\s*\)",
+]
+def clean_answer(text: str) -> str:
+    for pat in _CIT_PATTERNS:
+        text = re.sub(pat, "", text)
+    # remove double spaces left behind
+    return re.sub(r"\s{2,}", " ", text).strip()
 # --------------------------
 # Index: build or load once, keyed by data signature
 # --------------------------
@@ -106,7 +115,7 @@ def _load_vs(signature: str, force: bool = False):
 
 # Compute signature on every run (fast)
 data_sig = get_data_signature("data")
-st.caption(f"Index status: signature {data_sig[:8]}…")
+#st.caption(f"Index status: signature {data_sig[:8]}…")
 
 # Rebuild button
 if st.sidebar.button("Rebuild index now"):
@@ -204,6 +213,7 @@ if user_input:
 
     # 4) Call Gemini API
     answer = call_gemini(prompt_text)
+    answer = clean_answer(answer)
     
     # 5) Append assistant response to history and render
     st.session_state.messages.append({"role": "assistant", "content": answer})
