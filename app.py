@@ -1,9 +1,10 @@
 # =============================================
 # Samukelo's Personal Codex Agent (Streamlit)
-# Multi-turn chat + RAG + Hugging Face Inference API (deploy-friendly)
+# Multi-turn chat + RAG + Gemini API (deploy-friendly)
 # =============================================
 
 import os
+import google.generativeai as genai
 import requests
 from datetime import datetime
 import streamlit as st
@@ -31,82 +32,22 @@ if "mode" not in st.session_state:
     st.session_state.mode = "Interview mode"
 if "copy_buffer" not in st.session_state:
     st.session_state.copy_buffer = ""
-if "model_name" not in st.session_state:
-    # logical model key (mapped to a HF model id below)
-    st.session_state.model_name = "mistral"
 
 
 # --------------------------
-# Hugging Face Inference API helper
+# Gemini API helper
 # --------------------------
-def call_hf_inference(model_id: str, prompt: str, temperature: float = 0.5, max_new_tokens: int = 400) -> str:
-    """
-    Calls the Hugging Face Inference API for text generation.
-    Requires env var HF_TOKEN to be set (Streamlit Cloud -> App -> Settings -> Secrets).
-    """
-    hf_token = os.environ.get("HF_TOKEN", "").strip()
-    if not hf_token:
-        return ("⚠️ Missing HF_TOKEN. Set it in Streamlit Cloud (App → Settings → Secrets).\n"
-                "Create a Read token at https://huggingface.co/settings/tokens")
-
-    url = f"https://api-inference.huggingface.co/models/{model_id}"
-    headers = {"Authorization": f"Bearer {hf_token}"}
-    payload = {
-        "inputs": prompt,
-        "parameters": {
-            "temperature": temperature,
-            "max_new_tokens": max_new_tokens,
-            "return_full_text": False
-        }
-    }
+def call_gemini(prompt: str, model: str = "gemini-2.0-flash") -> str:
+    key = os.environ.get("GEMINI_API_KEY", "")
+    if not key:
+        return "⚠️ Missing GEMINI_API_KEY. Set it in Streamlit Cloud → Secrets."
     try:
-        resp = requests.post(url, headers=headers, json=payload, timeout=60)
-        resp.raise_for_status()
-        data = resp.json()
-        # Common successful shape: [{"generated_text": "..."}]
-        if isinstance(data, list) and data and isinstance(data[0], dict) and "generated_text" in data[0]:
-            return data[0]["generated_text"]
-        # Fallback: return raw JSON for debugging
-        return str(data)
+        genai.configure(api_key=key)
+        m = genai.GenerativeModel(model)
+        resp = m.generate_content(prompt)
+        return resp.text or ""
     except Exception as e:
-        return f"⚠️ Hugging Face Inference error: {e}"
-
-# Each logical model key maps to a list of candidate HF repos (first available wins)
-HF_MODEL_CANDIDATES = {
-    "mistral": [
-        "mistralai/Mistral-7B-Instruct-v0.1", 
-        "tiiuae/falcon-7b-instruct",     
-        "mosaicml/mpt-7b-instruct"              
-    ],
-    "llama3.1": [
-        "tiiuae/falcon-7b-instruct",
-        "mosaicml/mpt-7b-instruct"
-    ],
-    "qwen2.5": [
-        "Qwen/Qwen1.5-1.8B-Chat", 
-        "tiiuae/falcon-7b-instruct"
-    ],
-}
-
-def call_hf_inference_with_fallback(
-    logical_key: str,
-    prompt: str,
-    temperature: float = 0.5,
-    max_new_tokens: int = 400
-) -> str:
-    """
-    Try multiple HF models for a given logical key until one works.
-    Returns the first successful generated_text or the last error string.
-    """
-    candidates = HF_MODEL_CANDIDATES.get(logical_key, HF_MODEL_CANDIDATES["mistral"])
-    last_err = None
-    for model_id in candidates:
-        out = call_hf_inference(model_id, prompt, temperature=temperature, max_new_tokens=max_new_tokens)
-        # Heuristic: if the response starts with our warning string, it's an error -> try next model
-        if not (isinstance(out, str) and out.startswith("⚠️")):
-            return out
-        last_err = out  # remember the error and try next candidate
-    return last_err or "⚠️ All fallback models failed. Try a different model or check HF_TOKEN."
+        return f"⚠️ Gemini error: {e}"
 
 # --------------------------
 # Sidebar controls
@@ -118,8 +59,7 @@ with st.sidebar:
     st.session_state.mode = st.selectbox(
         "Answer mode",
         list(MODES.keys()),
-        index=list(MODES.keys()).index(st.session_state.mode),
-        help="Controls tone and structure of the assistant’s answers."
+        index=list(MODES.keys()).index(st.session_state.mode)
     )
 
     # Retriever depth
@@ -127,16 +67,7 @@ with st.sidebar:
         "Retriever k",
         min_value=3,
         max_value=10,
-        value=5,
-        help="How many chunks to fetch from the index per question."
-    )
-
-    # Model picker (maps to HF model IDs below)
-    st.session_state.model_name = st.selectbox(
-        "Model",
-        ["mistral", "llama3.1", "qwen2.5"],
-        index=["mistral", "llama3.1", "qwen2.5"].index(st.session_state.model_name),
-        help="If Llama is gated, the app will fall back automatically."
+        value=5
     )
 
     st.markdown("---")
@@ -161,10 +92,6 @@ with st.sidebar:
         st.text_area("Copy from here:", st.session_state.copy_buffer, height=120)
 
 
-# Helpful hint for first-time setup
-st.caption("Tip: Add .pdf/.md/.txt files to `data/`. The index auto-refreshes when files change.")
-
-
 # --------------------------
 # Index: build or load once, keyed by data signature
 # --------------------------
@@ -179,7 +106,7 @@ def _load_vs(signature: str, force: bool = False):
 
 # Compute signature on every run (fast)
 data_sig = get_data_signature("data")
-st.caption(f"Index status: signature {data_sig[:8]}… (auto-refreshes on file changes)")
+st.caption(f"Index status: signature {data_sig[:8]}…")
 
 # Rebuild button
 if st.sidebar.button("Rebuild index now"):
@@ -210,9 +137,9 @@ def build_llm_prompt(
     # Keep just the last N turns (each turn ~ user+assistant)
     recent = chat_history[-max_turns * 2:]
     history_lines = []
-    for m in recent:
-        speaker = "User" if m["role"] == "user" else "Assistant"
-        history_lines.append(f"{speaker}: {m['content']}")
+    history_lines = [
+        f"{'User' if m['role']=='user' else 'Assistant'}: {m['content']}" for m in recent
+    ]
     history_text = "\n".join(history_lines) if history_lines else "(no previous turns)"
 
     return f"""{BASE_SYSTEM}
@@ -245,7 +172,7 @@ for msg in st.session_state.messages:
 
 
 # --------------------------
-# Chat input (auto-clears)
+# Chat input
 # --------------------------
 placeholder = sample if sample != "(Choose)" else "Ask something like: What kind of engineer are you?"
 user_input = st.chat_input(placeholder=placeholder)
@@ -259,20 +186,12 @@ if user_input:
 
     # 2) Retrieve context from FAISS for this question
     try:
-        retrieved_context, docs = retrieve(vs, user_input, k=top_k)
+        retrieved_context, _ = retrieve(vs, user_input, k=top_k)
     except Exception as e:
         with st.chat_message("assistant"):
             st.error("Failed to retrieve context from the index.")
             st.exception(e)
         st.stop()
-
-    # Guard: empty context (no docs yet or no match)
-    if not retrieved_context.strip():
-        with st.chat_message("assistant"):
-            st.info(
-                "I didn’t find any matching context in your documents. "
-                "Add files to the `data/` folder for better grounded answers."
-            )
 
     # 3) Build prompt text for the model
     prompt_text = build_llm_prompt(
@@ -283,13 +202,8 @@ if user_input:
         max_turns=5
     )
 
-    # 4) Call HF Inference API (deploy-friendly)
-    answer = call_hf_inference_with_fallback(
-        logical_key=st.session_state.model_name,
-        prompt=prompt_text,
-        temperature=0.5,
-        max_new_tokens=400
-    )
+    # 4) Call Gemini API
+    answer = call_gemini(prompt_text)
     
     # 5) Append assistant response to history and render
     st.session_state.messages.append({"role": "assistant", "content": answer})
@@ -301,41 +215,6 @@ if user_input:
     #    st.code(retrieved_context)
 
 
-# --------------------------
-# Regenerate last answer (optional)
-# --------------------------
-regen = st.button("Regenerate answer for last question")
-if regen and len(st.session_state.messages) >= 2:
-    # find the most recent user message
-    last_user = None
-    for m in reversed(st.session_state.messages):
-        if m["role"] == "user":
-            last_user = m["content"]
-            break
-
-    if last_user:
-        retrieved_context, docs = retrieve(vs, last_user, k=top_k)
-        prompt_text = build_llm_prompt(
-            user_q=last_user,
-            retrieved_context=retrieved_context,
-            mode_key=st.session_state.mode,
-            chat_history=st.session_state.messages,
-            max_turns=5
-        )
-        new_answer = call_hf_inference_with_fallback(
-            logical_key=st.session_state.model_name,
-            prompt=prompt_text,
-            temperature=0.5,
-            max_new_tokens=400
-        )
-
-        # Replace the most recent assistant message content with the new one
-        for i in range(len(st.session_state.messages) - 1, -1, -1):
-            if st.session_state.messages[i]["role"] == "assistant":
-                st.session_state.messages[i]["content"] = new_answer
-                break
-
-        st.rerun()
 
 
 # --------------------------
