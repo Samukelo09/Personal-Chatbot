@@ -1,21 +1,19 @@
 # =============================================
 # Samukelo's Personal Codex Agent (Streamlit)
-# Multi-turn chat + RAG + Ollama (local, free)
+# Multi-turn chat + RAG + Hugging Face Inference API (deploy-friendly)
 # =============================================
 
+import os
 import io
 import json
+import requests
 from datetime import datetime
 import streamlit as st
 
 # RAG helpers (ensure these files exist in rag/)
-from rag.build_index import build_or_load_index, get_data_signature
+from rag.build_index import build_or_load_index, get_data_signature   # auto-rebuild enabled
 from rag.retriever import retrieve
 from rag.prompts import BASE_SYSTEM, MODES, QUESTION_HINTS
-
-# LLM (Ollama) via LangChain
-from langchain.schema import SystemMessage, HumanMessage
-from langchain_community.chat_models import ChatOllama
 
 
 # --------------------------
@@ -36,7 +34,44 @@ if "mode" not in st.session_state:
 if "copy_buffer" not in st.session_state:
     st.session_state.copy_buffer = ""
 if "model_name" not in st.session_state:
-    st.session_state.model_name = "mistral"  # default Ollama model
+    # logical model key (mapped to a HF model id below)
+    st.session_state.model_name = "mistral"
+
+
+# --------------------------
+# Hugging Face Inference API helper
+# --------------------------
+def call_hf_inference(model_id: str, prompt: str, temperature: float = 0.5, max_new_tokens: int = 400) -> str:
+    """
+    Calls the Hugging Face Inference API for text generation.
+    Requires env var HF_TOKEN to be set (Streamlit Cloud -> App -> Settings -> Secrets).
+    """
+    hf_token = os.environ.get("HF_TOKEN", "").strip()
+    if not hf_token:
+        return ("⚠️ Missing HF_TOKEN. Set it in Streamlit Cloud (App → Settings → Secrets).\n"
+                "Create a Read token at https://huggingface.co/settings/tokens")
+
+    url = f"https://api-inference.huggingface.co/models/{model_id}"
+    headers = {"Authorization": f"Bearer {hf_token}"}
+    payload = {
+        "inputs": prompt,
+        "parameters": {
+            "temperature": temperature,
+            "max_new_tokens": max_new_tokens,
+            "return_full_text": False
+        }
+    }
+    try:
+        resp = requests.post(url, headers=headers, json=payload, timeout=60)
+        resp.raise_for_status()
+        data = resp.json()
+        # Common successful shape: [{"generated_text": "..."}]
+        if isinstance(data, list) and data and isinstance(data[0], dict) and "generated_text" in data[0]:
+            return data[0]["generated_text"]
+        # Fallback: return raw JSON for debugging
+        return str(data)
+    except Exception as e:
+        return f"⚠️ Hugging Face Inference error: {e}"
 
 
 # --------------------------
@@ -62,53 +97,45 @@ with st.sidebar:
         help="How many chunks to fetch from the index per question."
     )
 
-    # Choose local Ollama model
+    # Model picker (maps to HF model IDs below)
     st.session_state.model_name = st.selectbox(
-        "Model (Ollama)",
-        ["mistral", "llama3.1", "qwen2.5:3b-instruct"],
-        index=["mistral", "llama3.1", "qwen2.5:3b-instruct"].index(st.session_state.model_name),
-        help="Run `ollama pull <model>` beforehand."
+        "Model",
+        ["mistral", "llama3.1", "qwen2.5"],
+        index=["mistral", "llama3.1", "qwen2.5"].index(st.session_state.model_name),
+        help="If Llama is gated, switch to Mistral."
     )
 
     st.markdown("---")
     st.caption("Try a sample question")
     sample = st.selectbox("Samples", ["(Choose)"] + QUESTION_HINTS)
     if sample != "(Choose)":
-        st.info(f"Selected sample: {sample}. Type it below or just press Enter to send.")
+        st.info(f"Selected sample: {sample}. Type it below or press Enter to send.")
 
     st.markdown("---")
-    # Utility buttons in three columns
+    # Utility buttons
+    
     if st.button("Clear chat"):
         st.session_state.messages = []
         st.session_state.copy_buffer = ""
-        st.experimental_rerun()
+        st.rerun()
     
-    # Copy last answer helper: places last AI message into a read-only textarea you can Ctrl+C
     if st.button("Copy last answer"):
-        last_ai = next(
-            (m for m in reversed(
-                st.session_state.get("messages", [])
-            ) if m["role"] == "assistant"),
-            None
-        )
+        last_ai = next((m for m in reversed(st.session_state.messages) if m["role"] == "assistant"), None)
         st.session_state.copy_buffer = last_ai["content"] if last_ai else ""
+
     if st.session_state.copy_buffer:
         st.text_area("Copy from here:", st.session_state.copy_buffer, height=120)
 
 
-
 # Helpful hint for first-time setup
-st.caption("Tip: Add .pdf/.md/.txt files to `data/` and restart the app to update the index.")
+st.caption("Tip: Add .pdf/.md/.txt files to `data/`. The index auto-refreshes when files change.")
 
 
 # --------------------------
-# Index: build or load once
+# Index: build or load once, keyed by data signature
 # --------------------------
-@st.cache_resource
-# ---- Index: build or load once, keyed by data signature ----
 @st.cache_resource
 def _load_vs(signature: str, force: bool = False):
-    # force lets us explicitly rebuild from the UI
     return build_or_load_index(
         index_dir="index",
         data_dir="data",
@@ -118,12 +145,10 @@ def _load_vs(signature: str, force: bool = False):
 
 # Compute signature on every run (fast)
 data_sig = get_data_signature("data")
-
-# A little status text
 st.caption(f"Index status: signature {data_sig[:8]}… (auto-refreshes on file changes)")
 
+# Rebuild button
 if st.sidebar.button("Rebuild index now"):
-    # force rebuild just for this run
     vs = _load_vs(data_sig, force=True)
     st.sidebar.success("Index rebuilt.")
 else:
@@ -179,15 +204,14 @@ If the answer is not in context, say so briefly and avoid fabrications.
 
 
 # --------------------------
-# Helper: instantiate the LLM
+# HF model id mapping
 # --------------------------
-def get_llm():
-    """Return a ChatOllama instance configured from sidebar settings."""
-    return ChatOllama(
-        model=st.session_state.model_name,  # "mistral", "llama3.1", ...
-        temperature=0.5,
-        base_url="http://localhost:11434"
-    )
+HF_MODEL_MAP = {
+    # solid public instruct models; if you hit access errors, pick Mistral
+    "mistral": "mistralai/Mistral-7B-Instruct-v0.3",
+    "llama3.1": "meta-llama/Meta-Llama-3.1-8B-Instruct",   # may be gated; accept license or switch to Mistral
+    "qwen2.5": "Qwen/Qwen2.5-7B-Instruct"
+}
 
 
 # --------------------------
@@ -225,13 +249,10 @@ if user_input:
         with st.chat_message("assistant"):
             st.info(
                 "I didn’t find any matching context in your documents. "
-                "Add files to the `data/` folder and restart the app for better grounded answers."
+                "Add files to the `data/` folder for better grounded answers."
             )
 
-    # 3) Build messages for the LLM
-    system_msg = SystemMessage(
-        content="You are Samukelo's Personal Codex Agent. Be accurate, concise, and cite snippets from CONTEXT when relevant."
-    )
+    # 3) Build prompt text for the model
     prompt_text = build_llm_prompt(
         user_q=user_input,
         retrieved_context=retrieved_context,
@@ -239,32 +260,19 @@ if user_input:
         chat_history=st.session_state.messages,
         max_turns=5
     )
-    human_msg = HumanMessage(content=prompt_text)
 
-    # 4) Query Ollama (local LLM)
-    llm = get_llm()
+    # 4) Call HF Inference API (deploy-friendly)
+    hf_model_id = HF_MODEL_MAP.get(st.session_state.model_name, HF_MODEL_MAP["mistral"])
+    answer = call_hf_inference(hf_model_id, prompt_text, temperature=0.5, max_new_tokens=400)
 
-    # 5) Generate answer and display
-    try:
-        response = llm.invoke([system_msg, human_msg])
-        answer = response.content
-    except Exception as e:
-        answer = (
-            "⚠️ I couldn't reach the local model.\n"
-            "Make sure Ollama is running and the model is pulled:\n"
-            "- Start server: `ollama serve`\n"
-            "- Pull model: `ollama pull " + st.session_state.model_name + "`\n"
-        )
-
-    # 6) Append assistant response to history and render
+    # 5) Append assistant response to history and render
     st.session_state.messages.append({"role": "assistant", "content": answer})
     with st.chat_message("assistant"):
         st.markdown(answer)
-        # quick, lightweight “sources used”
         if docs:
             st.caption("Sources used: " + ", ".join([f"[Doc {i+1}]" for i in range(len(docs))]))
 
-    # 7) Per-turn retrieved context (collapsible)
+    # 6) Per-turn retrieved context (collapsible)
     with st.expander("Retrieved Context"):
         st.code(retrieved_context)
 
@@ -272,24 +280,17 @@ if user_input:
 # --------------------------
 # Regenerate last answer (optional)
 # --------------------------
-# Button to re-generate the assistant's last response using the last user message
-regen = st.button("🔁 Regenerate answer for last question")
+regen = st.button("Regenerate answer for last question")
 if regen and len(st.session_state.messages) >= 2:
-    # Last turn should be: ... user, assistant
+    # find the most recent user message
     last_user = None
-    # Scan backwards to find the most recent user message
     for m in reversed(st.session_state.messages):
         if m["role"] == "user":
             last_user = m["content"]
             break
 
     if last_user:
-        # Fetch context again (could change after editing docs)
         retrieved_context, docs = retrieve(vs, last_user, k=top_k)
-
-        system_msg = SystemMessage(
-            content="You are Samukelo's Personal Codex Agent. Be accurate, concise, and cite snippets from CONTEXT when relevant."
-        )
         prompt_text = build_llm_prompt(
             user_q=last_user,
             retrieved_context=retrieved_context,
@@ -297,17 +298,8 @@ if regen and len(st.session_state.messages) >= 2:
             chat_history=st.session_state.messages,
             max_turns=5
         )
-        human_msg = HumanMessage(content=prompt_text)
-
-        llm = get_llm()
-        try:
-            response = llm.invoke([system_msg, human_msg])
-            new_answer = response.content
-        except Exception:
-            new_answer = (
-                "⚠️ I couldn't reach the local model to regenerate. "
-                "Ensure Ollama is running and the selected model is available."
-            )
+        hf_model_id = HF_MODEL_MAP.get(st.session_state.model_name, HF_MODEL_MAP["mistral"])
+        new_answer = call_hf_inference(hf_model_id, prompt_text, temperature=0.5, max_new_tokens=400)
 
         # Replace the most recent assistant message content with the new one
         for i in range(len(st.session_state.messages) - 1, -1, -1):
@@ -321,4 +313,4 @@ if regen and len(st.session_state.messages) >= 2:
 # --------------------------
 # Footer
 # --------------------------
-st.caption(f"Session started: {datetime.now().strftime('%Y-%m-%d')}. Powered by FAISS + Ollama.")
+st.caption(f"Session started: {datetime.now().strftime('%Y-%m-%d')}. Powered by FAISS + HF Inference API.")
