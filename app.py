@@ -4,8 +4,6 @@
 # =============================================
 
 import os
-import io
-import json
 import requests
 from datetime import datetime
 import streamlit as st
@@ -73,6 +71,45 @@ def call_hf_inference(model_id: str, prompt: str, temperature: float = 0.5, max_
     except Exception as e:
         return f"⚠️ Hugging Face Inference error: {e}"
 
+# Each logical model key maps to a list of candidate HF repos (first available wins)
+HF_MODEL_CANDIDATES = {
+    "mistral": [
+        # Use widely available, reliable instruct models first
+        "mistralai/Mistral-7B-Instruct-v0.2",
+        "mistralai/Mistral-7B-Instruct-v0.1",
+        "HuggingFaceH4/zephyr-7b-beta",
+    ],
+    "llama3.1": [
+        # Llama may be gated; we'll transparently fall back if 403/404
+        "meta-llama/Meta-Llama-3.1-8B-Instruct",
+        "meta-llama/Llama-3.2-3B-Instruct",
+        "HuggingFaceH4/zephyr-7b-beta",
+    ],
+    "qwen2.5": [
+        "Qwen/Qwen2.5-7B-Instruct",
+        "HuggingFaceH4/zephyr-7b-beta",
+    ],
+}
+
+def call_hf_inference_with_fallback(
+    logical_key: str,
+    prompt: str,
+    temperature: float = 0.5,
+    max_new_tokens: int = 400
+) -> str:
+    """
+    Try multiple HF models for a given logical key until one works.
+    Returns the first successful generated_text or the last error string.
+    """
+    candidates = HF_MODEL_CANDIDATES.get(logical_key, HF_MODEL_CANDIDATES["mistral"])
+    last_err = None
+    for model_id in candidates:
+        out = call_hf_inference(model_id, prompt, temperature=temperature, max_new_tokens=max_new_tokens)
+        # Heuristic: if the response starts with our warning string, it's an error -> try next model
+        if not (isinstance(out, str) and out.startswith("⚠️")):
+            return out
+        last_err = out  # remember the error and try next candidate
+    return last_err or "⚠️ All fallback models failed. Try a different model or check HF_TOKEN."
 
 # --------------------------
 # Sidebar controls
@@ -102,7 +139,7 @@ with st.sidebar:
         "Model",
         ["mistral", "llama3.1", "qwen2.5"],
         index=["mistral", "llama3.1", "qwen2.5"].index(st.session_state.model_name),
-        help="If Llama is gated, switch to Mistral."
+        help="If Llama is gated, the app will fall back automatically."
     )
 
     st.markdown("---")
@@ -202,18 +239,6 @@ Answer as Samukelo (first-person). Be specific and grounded in the CONTEXT when 
 If the answer is not in context, say so briefly and avoid fabrications.
 """
 
-
-# --------------------------
-# HF model id mapping
-# --------------------------
-HF_MODEL_MAP = {
-    # solid public instruct models; if you hit access errors, pick Mistral
-    "mistral": "mistralai/Mistral-7B-Instruct-v0.3",
-    "llama3.1": "meta-llama/Meta-Llama-3.1-8B-Instruct",   # may be gated; accept license or switch to Mistral
-    "qwen2.5": "Qwen/Qwen2.5-7B-Instruct"
-}
-
-
 # --------------------------
 # Render chat history
 # --------------------------
@@ -262,19 +287,21 @@ if user_input:
     )
 
     # 4) Call HF Inference API (deploy-friendly)
-    hf_model_id = HF_MODEL_MAP.get(st.session_state.model_name, HF_MODEL_MAP["mistral"])
-    answer = call_hf_inference(hf_model_id, prompt_text, temperature=0.5, max_new_tokens=400)
-
+    answer = call_hf_inference_with_fallback(
+        logical_key=st.session_state.model_name,
+        prompt=prompt_text,
+        temperature=0.5,
+        max_new_tokens=400
+    )
+    
     # 5) Append assistant response to history and render
     st.session_state.messages.append({"role": "assistant", "content": answer})
     with st.chat_message("assistant"):
         st.markdown(answer)
-        if docs:
-            st.caption("Sources used: " + ", ".join([f"[Doc {i+1}]" for i in range(len(docs))]))
 
     # 6) Per-turn retrieved context (collapsible)
-    with st.expander("Retrieved Context"):
-        st.code(retrieved_context)
+    #with st.expander("Retrieved Context"):
+    #    st.code(retrieved_context)
 
 
 # --------------------------
@@ -298,8 +325,12 @@ if regen and len(st.session_state.messages) >= 2:
             chat_history=st.session_state.messages,
             max_turns=5
         )
-        hf_model_id = HF_MODEL_MAP.get(st.session_state.model_name, HF_MODEL_MAP["mistral"])
-        new_answer = call_hf_inference(hf_model_id, prompt_text, temperature=0.5, max_new_tokens=400)
+        new_answer = call_hf_inference_with_fallback(
+            logical_key=st.session_state.model_name,
+            prompt=prompt_text,
+            temperature=0.5,
+            max_new_tokens=400
+        )
 
         # Replace the most recent assistant message content with the new one
         for i in range(len(st.session_state.messages) - 1, -1, -1):
