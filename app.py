@@ -74,20 +74,20 @@ def call_hf_inference(model_id: str, prompt: str, temperature: float = 0.5, max_
 # Each logical model key maps to a list of candidate HF repos (first available wins)
 HF_MODEL_CANDIDATES = {
     "mistral": [
-        # Use widely available, reliable instruct models first
-        "mistralai/Mistral-7B-Instruct-v0.2",
-        "mistralai/Mistral-7B-Instruct-v0.1",
-        "HuggingFaceH4/zephyr-7b-beta",
+        "mistralai/Mistral-7B-Instruct-v0.1",   # ✅ public
+        "mistralai/Mistral-7B-v0.1",            # ✅ public base
+        "tiiuae/falcon-7b-instruct",            # ✅ public
+        "google/gemma-2b-it"                    # ✅ light but works
     ],
     "llama3.1": [
-        # Llama may be gated; we'll transparently fall back if 403/404
-        "meta-llama/Meta-Llama-3.1-8B-Instruct",
-        "meta-llama/Llama-3.2-3B-Instruct",
-        "HuggingFaceH4/zephyr-7b-beta",
+        "meta-llama/Meta-Llama-3-8B-Instruct",  # ⚠️ gated, may need acceptance
+        "tiiuae/falcon-7b-instruct",            # fallback
+        "google/gemma-2b-it"
     ],
     "qwen2.5": [
-        "Qwen/Qwen2.5-7B-Instruct",
-        "HuggingFaceH4/zephyr-7b-beta",
+        "Qwen/Qwen2.5-1.8B-Instruct",           # ✅ small, public
+        "Qwen/Qwen1.5-1.8B-Chat",
+        "google/gemma-2b-it"
     ],
 }
 
