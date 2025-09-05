@@ -1,7 +1,7 @@
 ### Final Year of My Undergrad
 
 I completed my BSc in Computer Science & IT in 2024.  
-Here are the modules I took:
+Here are the modules I took last year:
 
 #### Semester 1
 - COMP313: Computer Systems  

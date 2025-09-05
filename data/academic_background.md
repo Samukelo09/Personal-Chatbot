@@ -15,6 +15,29 @@
   - Applied Systems Implementation
   - Data Structures
   - Object-Oriented Programming
+  - Theory of Computation
+  - Database Management
+  - Networking
+  - Systems Analysis & Design
+  - Calculus & Linear Algebra
+  - Computer Organisation & Architecture
+  - Statistical Models
+  - Computer Systems
+  - Numerical Mathematics
+
+- **Strengths**
+  - I'm good at analysing
+  - Problem solving
+  - Communication
+  - Time management
+
+- **Progamming Language preferences**
+  - Python 9/10
+  - Java 7/10
+  - C++ 5/10
+  - C# 4.8/10
+  - JavaScript 3.5/10
+  - Assembly 1/10
 
 ## Tutoring Experience
 - **Role**: Undergraduate Tutor (July 2023 - Present)
@@ -22,3 +45,4 @@
 - **Key Topics**: Finite automata, Turing machines, Algorithm efficiency analysis
 - **Approach**: Developed structured lesson plans and provided one-on-one mentorship
 - **Impact**: Helped students grasp complex computer science concepts
+

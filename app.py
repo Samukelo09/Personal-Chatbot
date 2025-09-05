@@ -90,6 +90,54 @@ with st.sidebar:
     if st.session_state.copy_buffer:
         st.text_area("Copy from here:", st.session_state.copy_buffer, height=120)
 
+    # Dataset management (add/update files)
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("Dataset")
+
+    DATA_DIR = "data"
+    os.makedirs(DATA_DIR, exist_ok=True)
+
+    # 1) Upload one or more files into /data
+    uploads = st.sidebar.file_uploader(
+        "Add files (.md, .txt, .pdf)",
+        type=["md", "txt", "pdf"],
+        accept_multiple_files=True
+    )
+
+    if uploads:
+        if st.sidebar.button("Save uploads to dataset"):
+            saved = 0
+            for f in uploads:
+                # Keep original name if possible; fallback to a safe name
+                fname = f.name if f.name else f"upload_{saved}.md"
+                path = os.path.join(DATA_DIR, fname)
+                with open(path, "wb") as out:
+                    out.write(f.read())
+                saved += 1
+
+            # Flag a rebuild and rerun
+            st.session_state["__new_files_added"] = True
+            st.sidebar.success(f"Saved {saved} file(s) to /data")
+            st.rerun()
+
+    # 2) Quick note -> create a new .md file inside /data
+    with st.sidebar.expander("✍️ Quick note (.md)", expanded=False):
+        note_title = st.text_input("Filename (no spaces, ends with .md)", value="new_note.md")
+        note_text = st.text_area("Content (Markdown)")
+
+        if st.button("Save note to dataset"):
+            # basic guard: ensure .md extension
+            if not note_title.lower().endswith(".md"):
+                note_title += ".md"
+            # sanitize filename a little
+            safe_name = note_title.replace(" ", "_").replace("/", "_")
+            path = os.path.join(DATA_DIR, safe_name)
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(note_text or "")
+            st.session_state["__new_files_added"] = True
+            st.sidebar.success(f"Saved {safe_name} to /data")
+            st.rerun()
+
 _CIT_PATTERNS = [
     r"\(\s*Doc[s]?\s*[\d,\s]+\)",
     r"\[\s*Doc[s]?\s*[\d,\s]+\s*\]",

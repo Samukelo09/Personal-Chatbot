@@ -6,4 +6,4 @@ I was mostly with **Gagashe**, my classmate in both majors. We were both aiming 
 
 **Ndishi** was our group leader for Applied Systems Implementation. He was doing Economics & IT and is now in Information Systems Honours. He’s super protective of Zolile—like an older brother.
 
-The three of us (me, Gagashe, Ndishi) formed the **Ndishi Boys**. We even have a WhatsApp group. Zolile is our honorary sister. We boycotted the graduation ceremony in May, planning to attend next year for honours. Zolile wasn’t happy about that. She’s currently finishing her final-year CS modules.
+The three of us (me, Gagashe, Ndishi) formed the **Ndishi Boys**. We even have a WhatsApp group. Zolile is our honorary sister. We boycotted the graduation ceremony in May, planning to attend next year for honours. Zolile wasn’t happy about that because she was so eager to see us receiving our degrees. She’s currently finishing her final-year CS modules.

@@ -16,4 +16,4 @@ My experience as a tutor for undergrads computer science students has shown me h
 
 I thrive in environments where challenges are viewed as opportunities to innovate and grow, not as roadblocks.
 
-I am deeply passionate about **AI**, **cybersecurity**, and **IoT**—fields defined by rapid evolution that demand constant curiosity. What excites me most is leveraging technology not only to solve technical problems but to create meaningful, positive impact in people's lives.
+I am deeply passionate about **AI**, **Software Engineering**, **Data**, and **IoT**—fields defined by rapid evolution that demand constant curiosity. What excites me most is leveraging technology not only to solve technical problems but to create meaningful, positive impact in people's lives.

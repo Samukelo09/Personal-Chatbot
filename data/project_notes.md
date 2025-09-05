@@ -1,7 +1,7 @@
 # Water Pipeline Leak Prediction Using Deep Learning
 
 ## Project Overview
-This project constitutes my honours research at the University of KwaZulu-Natal. The primary objective is to develop a predictive model capable of detecting water pipeline leaks in the eThekwini region using historical data provided by Umgeni Water.
+This project constitutes my honours research at the University of KwaZulu-Natal. It's the one i like the most since it combines all of my interests (Data, Development, AL/ML), and the fact that I have no one to rely on to do the extra work for me. The primary objective is to develop a predictive model capable of detecting water pipeline leaks in the eThekwini region using historical data provided by Umgeni Water.
 
 ## Motivation
 Water represents one of South Africa's most critical and scarce resources. The early detection of pipeline leaks offers significant benefits, including:

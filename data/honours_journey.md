@@ -27,6 +27,12 @@ I’m funded by the **NRF bursary**, which gives me peace of mind to focus fully
   Topic: *Deep Learning for Ontology Axioms Construction from Texts*.  
   Explores how deep learning can be applied to automate ontology building from natural language.
 
+- **COMP702: Coin Recognition**
+  This project aims to identify and classify South African bank coins using an automated pipeline that is invariant to coin side, scale, and rotation. The pipeline includes preprocessing, segmentation, feature extraction, and classification using both classical machine learning and deep learning (CNNs).
+
+- **COMP703: Machine Translation**
+  This project implements a neural machine translation (NMT) pipeline for Xhosa-to-English translation using sequence-to-sequence (Seq2Seq) models in PyTorch. Both a baseline LSTM encoder-decoder and an attention-based architecture are developed and evaluated, with comparisons to a pretrained multilingual transformer model (M2M100).
+
 ---
 
 ## Goals
@@ -42,6 +48,8 @@ I’m funded by the **NRF bursary**, which gives me peace of mind to focus fully
 Being admitted to honours was one of my proudest academic milestones.  
 I had even applied for jobs as a backup, but this programme was always my top priority.  
 I see it as the perfect stepping stone toward contributing impactful research and advancing my career.
+
+---
 
 ## My Interest 
 - Machine Learning & AI
