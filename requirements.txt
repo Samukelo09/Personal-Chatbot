@@ -1,0 +1,18 @@
+# --- core UI ---
+streamlit==1.37.1
+
+# --- langchain stack (matching versions) ---
+langchain==0.2.14
+langchain-community==0.2.12
+
+# --- embeddings and vector store ---
+sentence-transformers==2.7.0
+faiss-cpu==1.8.0.post1
+
+# --- PDF + I/O ---
+pypdf==4.3.1
+
+# --- infra & compat ---
+numpy<2.0
+requests==2.32.3
+typing-extensions>=4.10.0
