@@ -27,6 +27,8 @@ Now that I know her, I doubt my judgment that she's really innocent.
 Fast forward, and she owes me a meal she promised me last year.  
 Would you still consider her innocent?
 
+Btw aside of being a pretty face, she hates programming💀 
+
 ---
 
 ## **Mchunu**
