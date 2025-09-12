@@ -30,7 +30,7 @@ Btw aside of being a pretty face, she's also kind harted.
 
 Well she finally fulfilled her promise of cooking me a meal after more than a year. 
 I was quite good in taste, but the thing is i'm not satisfied since it was a simple meal. 
-She took advantage of my vulrenablility, but ke all in all, it was good.
+She took advantage of my vulrenablility, but ke all in all, it was good. And she also promised to another dish, isn't she sweet?🥹
 
 
 ---
