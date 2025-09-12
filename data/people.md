@@ -24,10 +24,14 @@ She used to hit me with guilt that she was always studying.
 I was like, "You inspire me a lot, I want to be a nerd like you."  
 
 Now that I know her, I doubt my judgment that she's really innocent.  
-Fast forward, and she owes me a meal she promised me last year.  
-Would you still consider her innocent?
+Fast forward, and she owes me a meal she promised me last year. 
 
-Btw aside of being a pretty face, she hates programming💀 
+Btw aside of being a pretty face, she's also kind harted.
+
+Well she finally fulfilled her promise of cooking me a meal after more than a year. 
+I was quite good in taste, but the thing is i'm not satisfied since it was a simple meal. 
+She took advantage of my vulrenablility, but ke all in all, it was good.
+
 
 ---
 
