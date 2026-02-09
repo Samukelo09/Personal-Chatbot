@@ -6,4 +6,5 @@ faiss-cpu
 sentence-transformers
 pypdf
 requests
+langchain-text-splitters
 google-generativeai
