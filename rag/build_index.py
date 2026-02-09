@@ -16,7 +16,7 @@ try:
 except Exception:
     _HAS_LC_LOADERS = False
 
-from langchain_text_splitter import RecursiveCharacterTextSplitter
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
 from langchain_community.embeddings import HuggingFaceEmbeddings
 
@@ -158,4 +158,5 @@ def build_or_load_index(
     vs.save_local(index_dir)
     _write_manifest(index_dir, data_signature, _list_data_files(data_dir))
     return vs
+
 
